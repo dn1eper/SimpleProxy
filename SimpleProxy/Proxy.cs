@@ -1,29 +1,30 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
-using System.Text.RegularExpressions;
 using System.Threading;
-using System.Threading.Tasks;
 
 namespace SimpleProxy
 {
     class Proxy
     {
-        TcpListener Listener;
+        public const int DEFAULT_PORT = 8080;
+        public const string DEFAULT_ADDRESS = "127.0.0.1";
+
+        private TcpListener Listener;
         private readonly string Host;
         private readonly int Port;
+        private readonly string Address;
         private const string HEADER = "HTTP/1.1 200 OK\r\n\r\n";
 
-        public Proxy(IPAddress address, int port, string host)
+        public Proxy(string host, string address=DEFAULT_ADDRESS, int port=DEFAULT_PORT)
         {
             Host = "http://" + host;
             Port = port;
-            Listener = new TcpListener(address, port);
+            Address = address;
+            Listener = new TcpListener(IPAddress.Parse(address), port);
         }
 
         ~Proxy()
@@ -34,11 +35,16 @@ namespace SimpleProxy
             }
         }
 
-        public void Start()
+        /// <summary>
+        /// Начинает работу прокси сервера
+        /// </summary>
+        /// <param name="isOpenBrowser"></param>
+        public void Start(bool isOpenBrowser=false)
         {
             Listener.Start();
             Console.WriteLine("Listening port: {0}\nConnected to: {1}", Port.ToString(), Host);
             Console.WriteLine("Press ESC to exit");
+            if (isOpenBrowser) Process.Start(string.Format("http://{0}:{1}", Address, Port));
             while (true)
             {
                 if (Console.KeyAvailable && Console.ReadKey(true).Key == ConsoleKey.Escape) break;
@@ -74,7 +80,7 @@ namespace SimpleProxy
             {
                 Response = (HttpWebResponse)Request.GetResponse();
             }
-            catch (WebException e)
+            catch (WebException)
             {
                 Console.WriteLine("Ошибка обращения по адресу: {0}", url);
                 return null;
@@ -86,6 +92,7 @@ namespace SimpleProxy
                 using (var reader = new StreamReader(content, Encoding.UTF8))
                 {
                     string strContent = reader.ReadToEnd();
+                    string headers = Response.Headers.ToString();
                     Response.Close();
                     // Если HTML страница, то модифицируем ее
                     if (strContent.IndexOf("text/html") != -1)
@@ -94,7 +101,6 @@ namespace SimpleProxy
                     }
                     return HEADER + strContent;
                 }
-                
             }
             return null;
         }
